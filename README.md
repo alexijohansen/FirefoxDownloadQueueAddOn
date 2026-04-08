@@ -5,6 +5,7 @@ An addon that sequentially queues and automatically manages multiple file downlo
 # How to run
 
 Open Firefox.
+
 Visit: about:debugging#/runtime/this-firefox
 
 Click “Load Temporary Add-on”.
