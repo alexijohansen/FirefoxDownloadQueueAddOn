@@ -16,6 +16,7 @@ Select the manifest.json file in your add-on folder.
 - **Scrape Page Links**: Right-click the page background and select "Queue All Video Links" to automatically queue all video links found on the page.
 - **Keyboard Shortcut**: Press `Ctrl+Shift+Y` to queue all file links on your current page.
 - **Automatic Retries**: If a download fails or is interrupted, the addon puts it in a retry timer. It automatically attempts to restart the download up to a configurable number of times.
+- **Clear Queue Options**: Click the extension icon in your browser toolbar to open a quick menu to completely clear the active queue or jump to settings. You can also clear the queue from the settings page itself.
 ## Configuration
 
 To access the options dashboard:

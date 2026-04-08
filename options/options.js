@@ -1,11 +1,20 @@
+// Wait for the HTML DOM to load before binding our logic
 document.addEventListener('DOMContentLoaded', () => {
   restoreOptions();
   refreshQueue();
 
   document.getElementById('options-form').addEventListener('submit', saveOptions);
   document.getElementById('refresh-queue').addEventListener('click', refreshQueue);
+  document.getElementById('clear-queue').addEventListener('click', () => {
+    if (confirm("Are you sure you want to completely clear the download queue?")) {
+      browser.runtime.sendMessage({ type: "clear-queue" }).then(() => {
+        refreshQueue();
+      });
+    }
+  });
 });
 
+// Helper to load current values from Extension Native Storage (which persists across Firefox sessions)
 function restoreOptions() {
   browser.storage.local.get({
     maxActiveDownloads: 1,
@@ -30,12 +39,14 @@ function saveOptions(e) {
   const retryDelay = parseInt(document.getElementById('retryDelay').value, 10);
   const maxRetries = parseInt(document.getElementById('maxRetries').value, 10);
   
+  // Create array from comma separated string
   const extInput = document.getElementById('scrapeExtensions').value;
   const scrapeExtensions = extInput.split(',')
     .map(s => s.trim())
     .filter(s => s.length > 0)
     .map(s => s.startsWith('.') ? s : `.${s}`); // Ensure extensions start with dot
 
+  // Securely persist into local database
   browser.storage.local.set({
     maxActiveDownloads,
     downloadDelay,

@@ -1,7 +1,9 @@
 function scrapeLinksAndSend(usaOnly = false) {
+  // We retrieve the accepted file types dynamically directly from the browser's persistent storage
   browser.storage.local.get({ scrapeExtensions: [".zip", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"] }).then(res => {
     const videoExtensions = res.scrapeExtensions;
 
+    // Grab all explicit links (<a> tags) from the webpage DOM
     const allLinks = Array.from(document.querySelectorAll("a[href]"))
     .map(a => a.href)
     .filter(href => {
@@ -25,9 +27,10 @@ function scrapeLinksAndSend(usaOnly = false) {
       }
     });
 
-    // Remove duplicates
+    // Remove duplicates found on the page
     const uniqueLinks = [...new Set(allLinks)];
 
+    // Once links are collected, pass the payload globally to the background script process
     browser.runtime.sendMessage({
       type: "video-links",
       links: uniqueLinks,
@@ -37,6 +40,7 @@ function scrapeLinksAndSend(usaOnly = false) {
 }
 
 // --- Listen for messages from background ---
+// This listens for direct tab commands fired off by our background Keyboard Shortcuts or Context Menus.
 browser.runtime.onMessage.addListener((message, sender) => {
 
   if (message.type === "scrape-links") {

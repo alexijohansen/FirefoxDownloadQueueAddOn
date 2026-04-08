@@ -1,8 +1,10 @@
+// Configurable constraints loaded from extension storage
 let MAX_ACTIVE_DOWNLOADS = 1;
 let RETRY_DELAY = 30000;
 let MAX_RETRIES = 10;
 let DOWNLOAD_DELAY = 5000;
 
+// Load stored settings on extension startup to initialize our variables.
 browser.storage.local.get(['maxActiveDownloads', 'retryDelay', 'maxRetries', 'downloadDelay']).then((res) => {
   if (res.maxActiveDownloads !== undefined) MAX_ACTIVE_DOWNLOADS = res.maxActiveDownloads;
   if (res.retryDelay !== undefined) RETRY_DELAY = res.retryDelay;
@@ -10,6 +12,8 @@ browser.storage.local.get(['maxActiveDownloads', 'retryDelay', 'maxRetries', 'do
   if (res.downloadDelay !== undefined) DOWNLOAD_DELAY = res.downloadDelay;
 });
 
+// Add a listener to instantly enforce settings when a user changes them via the Options page.
+// The background script stays alive (persistent: true), so it can react immediately.
 browser.storage.local.onChanged.addListener((changes) => {
   if (changes.maxActiveDownloads) MAX_ACTIVE_DOWNLOADS = changes.maxActiveDownloads.newValue;
   if (changes.retryDelay) RETRY_DELAY = changes.retryDelay.newValue;
@@ -18,11 +22,13 @@ browser.storage.local.onChanged.addListener((changes) => {
   processQueue(); // Try processing if limit was increased
 });
 
-let downloadQueue = [];
+// In-memory queues to track our downloads
+// Web Extensions don't organically provide sequential downloading natively, so we manage the logic.
+let downloadQueue = []; 
 let activeDownloads = 0;
-let queuedUrls = new Set();
-let downloadRetries = new Map();
-let activeDownloadItems = new Map(); // downloadId -> {url, folder}
+let queuedUrls = new Set(); // Prevent duplicates by maintaining a set of known URLs waiting
+let downloadRetries = new Map(); // Keep track of fail counts per URL
+let activeDownloadItems = new Map(); // Maps native Firefox download IDs -> {url, folder}
 
 let retryScheduled = false;
 let retryQueue = [];
@@ -30,6 +36,15 @@ let retryQueue = [];
 let isWaiting = false;
 
 let downloadFolder = "download_queue";
+
+// --- Helper: clear queue completely ---
+function clearQueueData() {
+  downloadQueue = [];
+  retryQueue = [];
+  downloadRetries.clear();
+  queuedUrls.clear();
+  console.log("Download queue cleared.");
+}
 
 // --- Helper: extract clean filename ---
 function extractFilename(url) {
@@ -57,6 +72,7 @@ function isUrlActiveOrQueued(url) {
 }
 
 // --- Main queue processor ---
+// The core orchestrator. Starts native Firefox downloads if below MAX_ACTIVE_DOWNLOADS.
 function processQueue() {
 
   if (isWaiting) return;
@@ -72,10 +88,11 @@ function processQueue() {
 
     activeDownloads++;
 
+    // Tap into the native browser downloads API
     browser.downloads.download({
       url,
       filename,
-      conflictAction: "uniquify"
+      conflictAction: "uniquify" // Automatically appends (1), (2) to duplicate physical files on disk
     }).then(id => {
 
       console.log(`Started download ${id} for ${url} into ${filename}`);
@@ -204,6 +221,7 @@ browser.downloads.onChanged.addListener(delta => {
 });
 
 // --- Context Menus ---
+// Register options shown when right clicking links or anywhere on a document.
 browser.contextMenus.create({
   id: "queue-download",
   title: "Queue Download",
@@ -256,10 +274,12 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 // --- Keyboard shortcut ---
+// Defined in manifest.json "commands" block. Overrides Ctrl+Shift+Y to trigger scraping natively.
 browser.commands.onCommand.addListener(command => {
 
   if (command === "queue-video-links") {
 
+    // Query Firefox for the user's currently focused browser tab to send a direct message payload
     browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
 
       if (tabs[0]) {
@@ -273,7 +293,23 @@ browser.commands.onCommand.addListener(command => {
 });
 
 // --- Handle messages ---
+// Allows the content script or extension UI (Popups/Options) to talk to this background script.
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+  if (message.type === "clear-queue") {
+    clearQueueData();
+    
+    if (message.showNotification) {
+      browser.notifications.create({
+        type: "basic",
+        title: "Download Queue Manager",
+        message: "Download queue has been fully cleared!"
+      });
+    }
+    
+    sendResponse({ success: true });
+    return;
+  }
 
   if (message.type === "get-queue") {
     sendResponse({ queue: downloadQueue });

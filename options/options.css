@@ -165,6 +165,28 @@ small {
   background-color: var(--border-color);
 }
 
+.btn.danger {
+  background-color: transparent;
+  border-color: #d73a49;
+  color: #d73a49;
+}
+
+.btn.danger:hover {
+  background-color: #d73a49;
+  color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn.danger {
+    border-color: #ff7b72;
+    color: #ff7b72;
+  }
+  .btn.danger:hover {
+    background-color: #ff7b72;
+    color: #000;
+  }
+}
+
 .status-message {
   font-size: 14px;
   color: var(--success-color);
