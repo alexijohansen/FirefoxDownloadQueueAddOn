@@ -6,7 +6,9 @@ An addon that sequentially queues and automatically manages multiple file downlo
 
 Open Firefox.
 Visit: about:debugging#/runtime/this-firefox
+
 Click “Load Temporary Add-on”.
+
 Select the manifest.json file in your add-on folder.
 
 ## Features
