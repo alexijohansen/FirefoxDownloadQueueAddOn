@@ -1,0 +1,42 @@
+{
+  "manifest_version": 2,
+  "name": "Download Queue Manager",
+  "version": "1.4",
+  "description": "Queue and manage your downloads efficiently.",
+  "permissions": [
+    "downloads",
+    "downloads.open",
+    "contextMenus",
+    "storage",
+    "activeTab",
+    "notifications"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "queue-video-links": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Queue all file links on the current page"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "download-queue@example.com"
+    }
+  },
+  "icons": {
+    "48": "icons/icon.png"
+  }
+}
