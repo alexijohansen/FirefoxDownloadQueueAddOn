@@ -1,7 +1,22 @@
-const MAX_ACTIVE_DOWNLOADS = 1;
-const RETRY_DELAY = 30000;
-const MAX_RETRIES = 10;
-const DOWNLOAD_DELAY = 5000;
+let MAX_ACTIVE_DOWNLOADS = 1;
+let RETRY_DELAY = 30000;
+let MAX_RETRIES = 10;
+let DOWNLOAD_DELAY = 5000;
+
+browser.storage.local.get(['maxActiveDownloads', 'retryDelay', 'maxRetries', 'downloadDelay']).then((res) => {
+  if (res.maxActiveDownloads !== undefined) MAX_ACTIVE_DOWNLOADS = res.maxActiveDownloads;
+  if (res.retryDelay !== undefined) RETRY_DELAY = res.retryDelay;
+  if (res.maxRetries !== undefined) MAX_RETRIES = res.maxRetries;
+  if (res.downloadDelay !== undefined) DOWNLOAD_DELAY = res.downloadDelay;
+});
+
+browser.storage.local.onChanged.addListener((changes) => {
+  if (changes.maxActiveDownloads) MAX_ACTIVE_DOWNLOADS = changes.maxActiveDownloads.newValue;
+  if (changes.retryDelay) RETRY_DELAY = changes.retryDelay.newValue;
+  if (changes.maxRetries) MAX_RETRIES = changes.maxRetries.newValue;
+  if (changes.downloadDelay) DOWNLOAD_DELAY = changes.downloadDelay.newValue;
+  processQueue(); // Try processing if limit was increased
+});
 
 let downloadQueue = [];
 let activeDownloads = 0;
@@ -117,35 +132,33 @@ function scheduleRetry(url, folder) {
   if (retryScheduled) return;
 
   retryScheduled = true;
+  setTimeout(processNextRetry, RETRY_DELAY);
 
-  setTimeout(() => {
+}
 
-    retryScheduled = false;
+function processNextRetry() {
+  retryScheduled = false;
 
-    if (retryQueue.length > 0) {
+  if (retryQueue.length > 0) {
+    const nextRetry = retryQueue.shift();
 
-      const nextRetry = retryQueue.shift();
+    console.log(`Retrying ${nextRetry.url}`);
 
-      console.log(`Retrying ${nextRetry.url}`);
-
-      // ✅ DOUBLE CHECK before re-queueing
-      if (!isUrlActiveOrQueued(nextRetry.url)) {
-        downloadQueue.unshift(nextRetry);
-      } else {
-        console.log(`Skipping retry (already active/queued): ${nextRetry.url}`);
-      }
-
-      processQueue();
-
-      // Schedule next retry if more remain
-      if (retryQueue.length > 0) {
-        scheduleRetry(nextRetry.url, nextRetry.folder);
-      }
-
+    // ✅ DOUBLE CHECK before re-queueing
+    if (!isUrlActiveOrQueued(nextRetry.url)) {
+      downloadQueue.unshift(nextRetry);
+    } else {
+      console.log(`Skipping retry (already active/queued): ${nextRetry.url}`);
     }
 
-  }, RETRY_DELAY);
+    processQueue();
 
+    // Schedule next retry if more remain
+    if (retryQueue.length > 0) {
+      retryScheduled = true;
+      setTimeout(processNextRetry, RETRY_DELAY);
+    }
+  }
 }
 
 // --- Download state watcher ---
@@ -259,8 +272,13 @@ browser.commands.onCommand.addListener(command => {
 
 });
 
-// --- Handle scraped links ---
-browser.runtime.onMessage.addListener((message, sender) => {
+// --- Handle messages ---
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+  if (message.type === "get-queue") {
+    sendResponse({ queue: downloadQueue });
+    return true; // Indicates asynchronous response (though not strictly necessary here, ensures compatibility)
+  }
 
   if (message.type === "video-links" && Array.isArray(message.links)) {
 

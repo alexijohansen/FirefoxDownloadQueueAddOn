@@ -36,6 +36,10 @@
       "id": "download-queue@example.com"
     }
   },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "48": "icons/icon.png"
   }

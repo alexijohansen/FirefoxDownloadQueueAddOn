@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Download Queue Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Download Queue Settings</h1>
+    </header>
+    
+    <main>
+      <section class="card">
+        <h2>Configuration</h2>
+        <form id="options-form">
+          <div class="form-group">
+            <label for="maxActiveDownloads">Max Active Downloads</label>
+            <input type="number" id="maxActiveDownloads" min="1" max="10" required>
+            <small>Number of files downloading simultaneously.</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="downloadDelay">Download Delay (ms)</label>
+            <input type="number" id="downloadDelay" min="0" step="1000" required>
+            <small>Wait time after a download finishes before starting the next.</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="retryDelay">Retry Delay (ms)</label>
+            <input type="number" id="retryDelay" min="0" step="1000" required>
+            <small>Wait time before retrying a failed download.</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="maxRetries">Max Retries</label>
+            <input type="number" id="maxRetries" min="0" max="100" required>
+            <small>Maximum number of attempts for a single failed file.</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="scrapeExtensions">Scrape Extensions</label>
+            <input type="text" id="scrapeExtensions" style="max-width: 100%;" placeholder=".mp4, .zip, .mkv" required>
+            <small>Comma-separated list of file extensions to include when scraping the page.</small>
+          </div>
+          
+          <div class="actions">
+            <button type="submit" class="btn primary">Save Changes</button>
+            <span id="status" class="status-message"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Current Queue</h2>
+          <button id="refresh-queue" class="btn secondary">Refresh Queue</button>
+        </div>
+        <div class="queue-container">
+          <ul id="queue-list" class="queue-list">
+            <li class="empty-state">Queue is currently empty</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

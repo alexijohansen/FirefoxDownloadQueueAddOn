@@ -1,7 +1,8 @@
 function scrapeLinksAndSend(usaOnly = false) {
-  const videoExtensions = [".zip", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"];
+  browser.storage.local.get({ scrapeExtensions: [".zip", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"] }).then(res => {
+    const videoExtensions = res.scrapeExtensions;
 
-  const allLinks = Array.from(document.querySelectorAll("a[href]"))
+    const allLinks = Array.from(document.querySelectorAll("a[href]"))
     .map(a => a.href)
     .filter(href => {
       try {
@@ -24,13 +25,14 @@ function scrapeLinksAndSend(usaOnly = false) {
       }
     });
 
-  // Remove duplicates
-  const uniqueLinks = [...new Set(allLinks)];
+    // Remove duplicates
+    const uniqueLinks = [...new Set(allLinks)];
 
-  browser.runtime.sendMessage({
-    type: "video-links",
-    links: uniqueLinks,
-    usaOnly
+    browser.runtime.sendMessage({
+      type: "video-links",
+      links: uniqueLinks,
+      usaOnly
+    });
   });
 }
 
