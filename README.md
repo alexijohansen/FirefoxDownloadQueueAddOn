@@ -9,7 +9,6 @@ Visit: about:debugging#/runtime/this-firefox
 Click “Load Temporary Add-on”.
 Select the manifest.json file in your add-on folder.
 
-
 ## Features
 
 - **Queue Links via Context Menu**: Right-click any link on a page and select "Queue Download" to add it to your download queue.
