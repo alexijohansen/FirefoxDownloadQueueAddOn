@@ -39,9 +39,20 @@ function scrapeLinksAndSend(usaOnly = false) {
   });
 }
 
+let lastRightClickedText = null;
+let lastRightClickedUrl = null;
+
+document.addEventListener("contextmenu", (event) => {
+  const link = event.target.closest("a");
+  if (link) {
+    lastRightClickedText = link.innerText.trim();
+    lastRightClickedUrl = link.href;
+  }
+}, true);
+
 // --- Listen for messages from background ---
 // This listens for direct tab commands fired off by our background Keyboard Shortcuts or Context Menus.
-browser.runtime.onMessage.addListener((message, sender) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "scrape-links") {
     scrapeLinksAndSend(false);
@@ -49,6 +60,14 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
   if (message.type === "scrape-links-usa") {
     scrapeLinksAndSend(true);
+  }
+
+  if (message.type === "get-link-text") {
+    if (lastRightClickedUrl === message.url) {
+      sendResponse({ text: lastRightClickedText });
+    } else {
+      sendResponse({ text: null });
+    }
   }
 
 });

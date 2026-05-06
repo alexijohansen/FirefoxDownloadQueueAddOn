@@ -34,8 +34,11 @@ let retryScheduled = false;
 let retryQueue = [];
 
 let isWaiting = false;
-
 let downloadFolder = "download_queue";
+
+// --- Folder Task Queue Management ---
+let folderTaskQueue = [];
+let activeFolderTask = null; // { url, folderName, pendingFiles: 0, isScraping: false }
 
 // --- Helper: clear queue completely ---
 function clearQueueData() {
@@ -56,6 +59,12 @@ function extractFilename(url) {
   } catch (e) {
     return `downloaded_file_${Date.now()}`;
   }
+}
+
+// --- Helper: sanitize folder name ---
+function sanitizeFolderName(name) {
+  // Replace invalid filename characters with underscores
+  return name.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim() || "scraped_folder";
 }
 
 // --- NEW: check if URL already active or queued ---
@@ -200,6 +209,12 @@ browser.downloads.onChanged.addListener(delta => {
     // ✅ Remove from retry queue
     retryQueue = retryQueue.filter(item => item.url !== meta.url);
 
+    // ✅ Track folder task completion
+    if (activeFolderTask && meta.folder.startsWith(`${downloadFolder}/${activeFolderTask.folderName}`)) {
+      activeFolderTask.pendingFiles--;
+      checkFolderTaskCompletion();
+    }
+
     waitAndProcessQueue();
 
   }
@@ -212,6 +227,12 @@ browser.downloads.onChanged.addListener(delta => {
 
     activeDownloadItems.delete(delta.id);
 
+    // ✅ Even if it failed and we might retry, we still need to track its impact on the "current folder" status
+    // But since scheduleRetry adds it back to the queue, we'll keep it as pending if we want to wait for retries too.
+    // However, if we reach MAX_RETRIES, it will be lost.
+    // For simplicity, let's say it's still pending if it's in the retry cycle.
+    // If it's totally failed (reached max retries), we should decrement.
+    
     scheduleRetry(meta.url, meta.folder);
 
     waitAndProcessQueue();
@@ -219,6 +240,17 @@ browser.downloads.onChanged.addListener(delta => {
   }
 
 });
+
+/**
+ * Checks if the current folder task is completely finished (scraped + all files downloaded).
+ */
+function checkFolderTaskCompletion() {
+  if (activeFolderTask && !activeFolderTask.isScraping && activeFolderTask.pendingFiles <= 0) {
+    console.log(`Folder task completed: ${activeFolderTask.folderName}`);
+    activeFolderTask = null;
+    processFolderTasks();
+  }
+}
 
 // --- Context Menus ---
 // Register options shown when right clicking links or anywhere on a document.
@@ -238,6 +270,12 @@ browser.contextMenus.create({
   id: "scrape-video-links-usa",
   title: "Queue All Video Links (USA only)",
   contexts: ["page"]
+});
+
+browser.contextMenus.create({
+  id: "queue-folder-download",
+  title: "Queue Folder Download",
+  contexts: ["link"]
 });
 
 // --- Context menu handler ---
@@ -271,7 +309,115 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     browser.tabs.sendMessage(tab.id, { type: "scrape-links-usa" });
   }
 
+  if (info.menuItemId === "queue-folder-download") {
+    const url = info.linkUrl;
+    // Fallback folder name from the URL
+    let folderName = url.split('/').filter(Boolean).pop() || "scraped_folder";
+    
+    // Try to get the actual link text from the content script for a better folder name
+    browser.tabs.sendMessage(tab.id, { type: "get-link-text", url: url })
+      .then(response => {
+        if (response && response.text) {
+          folderName = sanitizeFolderName(response.text);
+        }
+      })
+      .catch(err => {
+        console.log("Could not get link text, using URL component instead.");
+      })
+      .finally(() => {
+        console.log(`Queuing folder task: ${url} -> ${folderName}`);
+        folderTaskQueue.push({ url, folderName, pendingFiles: 0, isScraping: false });
+        processFolderTasks();
+      });
+  }
+
 });
+
+/**
+ * Orchestrates the sequential processing of folder tasks.
+ */
+async function processFolderTasks() {
+  if (activeFolderTask || folderTaskQueue.length === 0) return;
+
+  activeFolderTask = folderTaskQueue.shift();
+  activeFolderTask.isScraping = true;
+
+  const scrapeUrl = activeFolderTask.url.endsWith('/') ? activeFolderTask.url : activeFolderTask.url + '/';
+  console.log(`Starting folder task: ${activeFolderTask.folderName}`);
+  
+  await scrapeFolder(scrapeUrl, `${downloadFolder}/${activeFolderTask.folderName}`);
+  
+  activeFolderTask.isScraping = false;
+  console.log(`Scraping finished for ${activeFolderTask.folderName}, waiting for ${activeFolderTask.pendingFiles} files...`);
+  
+  // Check if it's already done (e.g. empty folder)
+  checkFolderTaskCompletion();
+}
+
+/**
+ * Recursively scrapes a directory listing page.
+ * @param {string} url The URL of the directory listing.
+ * @param {string} currentFolder The relative folder path for downloads.
+ */
+async function scrapeFolder(url, currentFolder) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const html = await response.text();
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const links = Array.from(doc.querySelectorAll("a"));
+
+    const originUrl = new URL(url);
+
+    for (const link of links) {
+      const href = link.getAttribute("href");
+      if (!href) continue;
+
+      // Ignore parent directory, current directory, query strings, and fragments
+      if (href === "../" || href === "./" || href.startsWith("?") || href.startsWith("#")) continue;
+      
+      const absoluteUrl = new URL(href, url).href;
+      const targetUrl = new URL(absoluteUrl);
+
+      // 1. Must stay on the same domain
+      if (targetUrl.hostname !== originUrl.hostname) {
+        continue;
+      }
+
+      // 2. Must stay within the same folder branch (don't go "up" or "sideways")
+      if (!absoluteUrl.startsWith(url)) {
+        continue;
+      }
+
+      if (href.endsWith("/")) {
+        // It's a directory, recurse
+        const subFolderName = href.slice(0, -1);
+        await scrapeFolder(absoluteUrl, `${currentFolder}/${subFolderName}`);
+      } else {
+        // It's a file, queue it
+        if (!queuedUrls.has(absoluteUrl)) {
+          queuedUrls.add(absoluteUrl);
+          
+          // Track pending files for the active folder task
+          if (activeFolderTask) {
+            activeFolderTask.pendingFiles++;
+          }
+          
+          downloadQueue.push({ url: absoluteUrl, folder: currentFolder });
+          console.log(`Queued file: ${absoluteUrl} into ${currentFolder}`);
+        }
+      }
+    }
+    
+    // Process the queue after finding new files
+    processQueue();
+    
+  } catch (error) {
+    console.error(`Error scraping ${url}:`, error);
+  }
+}
 
 // --- Keyboard shortcut ---
 // Defined in manifest.json "commands" block. Overrides Ctrl+Shift+Y to trigger scraping natively.
