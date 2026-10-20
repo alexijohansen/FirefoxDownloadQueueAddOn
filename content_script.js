@@ -1,6 +1,6 @@
 function scrapeLinksAndSend(usaOnly = false) {
   // We retrieve the accepted file types dynamically directly from the browser's persistent storage
-  browser.storage.local.get({ scrapeExtensions: [".zip", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"] }).then(res => {
+  browser.storage.local.get({ scrapeExtensions: [".zip",".7z" , ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"] }).then(res => {
     const videoExtensions = res.scrapeExtensions;
 
     // Grab all explicit links (<a> tags) from the webpage DOM

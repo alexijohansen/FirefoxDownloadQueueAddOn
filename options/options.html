@@ -54,12 +54,89 @@
 
       <section class="card">
         <div class="card-header">
-          <h2>Current Queue</h2>
-          <div>
-            <button id="clear-queue" class="btn danger" style="margin-right: 8px;">Clear Queue</button>
-            <button id="refresh-queue" class="btn secondary">Refresh Queue</button>
+          <div class="card-title-group">
+            <h2>Current Queue</h2>
+            <span id="queue-badge-count" class="queue-badge-pill">0 items</span>
+          </div>
+          <div class="queue-actions">
+            <button id="toggle-pause" class="btn primary">Resume Queue</button>
+            <button id="btn-filter-folder" class="btn accent" title="Select download folder on disk to remove already-downloaded files from queue">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                <polyline points="9 13 12 16 15 13"></polyline>
+                <line x1="12" y1="9" x2="12" y2="16"></line>
+              </svg>
+              Check Download Folder
+            </button>
+            <button id="btn-filter-history" class="btn secondary" title="Check Firefox's download history directly without opening a folder dialog">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 14 14"></polyline>
+              </svg>
+              Check History
+            </button>
+            <button id="btn-toggle-add-links" class="btn secondary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Add Links
+            </button>
+            <button id="clear-queue" class="btn danger">Clear Queue</button>
+            <button id="refresh-queue" class="btn secondary">Refresh</button>
+            <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
           </div>
         </div>
+
+        <div class="folder-hint-row">
+          <span>🔒 <strong>Note on "Upload" dialog:</strong> Firefox's folder picker says "Upload" because HTML standard calls directory pickers "upload", but files are processed <strong>100% locally</strong> on your PC. No files are uploaded to any server.</span>
+        </div>
+
+        <!-- Filter Status Alert Banner -->
+        <div id="filter-banner" class="alert-banner" style="display: none;">
+          <div class="alert-icon" id="filter-banner-icon">📁</div>
+          <div class="alert-body">
+            <div id="filter-banner-title" class="alert-title">Folder Filter Result</div>
+            <div id="filter-banner-desc" class="alert-desc"></div>
+            <div id="removed-list-container" class="removed-list-container" style="display: none;">
+              <div class="removed-list-heading">Removed already-downloaded files:</div>
+              <ul id="removed-list" class="removed-list"></ul>
+            </div>
+          </div>
+          <div class="alert-actions">
+            <button id="toggle-removed-btn" class="btn-sm btn-link" style="display: none;">Show Details</button>
+            <button id="close-banner-btn" class="btn-close" title="Dismiss">✕</button>
+          </div>
+        </div>
+
+        <!-- Add Links Collapsible Panel -->
+        <div id="add-links-panel" class="collapsible-panel" style="display: none;">
+          <div class="panel-header">
+            <h3>Add Links to Queue</h3>
+            <button id="close-add-links" class="btn-close" title="Close">✕</button>
+          </div>
+          <div class="form-group">
+            <label for="manual-urls">URLs (one per line):</label>
+            <textarea id="manual-urls" class="code-textarea" rows="4" placeholder="https://example.com/video1.mp4&#10;https://example.com/video2.mp4"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="manual-folder">Destination Subfolder:</label>
+              <input type="text" id="manual-folder" value="download_queue" placeholder="download_queue">
+            </div>
+            <div class="form-group-checkbox">
+              <label>
+                <input type="checkbox" id="add-paused-check" checked> Keep queue paused
+              </label>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button id="btn-submit-links" class="btn primary">Add to Queue</button>
+            <button id="btn-cancel-links" class="btn secondary">Cancel</button>
+            <span id="add-links-status" class="status-message"></span>
+          </div>
+        </div>
+
         <div class="queue-container">
           <ul id="queue-list" class="queue-list">
             <li class="empty-state">Queue is currently empty</li>
